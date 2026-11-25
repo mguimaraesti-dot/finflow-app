@@ -1,0 +1,441 @@
+// FinFlow — modelo de dados.
+// Regras que não cabem no Prisma (RLS, views, funções, CHECKs) estão nas migrations SQL
+// em prisma/migrations; veja docs/decisions/0003-rls.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Identidade (fora do RLS: só a API acessa) ----------
+
+model User {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email           String    @unique
+  name            String
+  passwordHash    String    @map("password_hash")
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  mfaSecretEnc    String?   @map("mfa_secret_enc")
+  mfaEnabledAt    DateTime? @map("mfa_enabled_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sessions       Session[]
+  passwordResets PasswordReset[]
+  memberships    Membership[]
+  consents       Consent[]
+
+  @@map("users")
+}
+
+model Session {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash")
+  userAgent        String?   @map("user_agent")
+  ip               String?
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  replacedById     String?   @map("replaced_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt       DateTime  @default(now()) @map("last_used_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model PasswordReset {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+model Consent {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  purpose   String
+  version   String
+  grantedAt DateTime  @default(now()) @map("granted_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("consents")
+}
+
+model IdempotencyKey {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  key         String
+  requestHash String   @map("request_hash")
+  statusCode  Int      @map("status_code")
+  response    Json
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@unique([userId, key])
+  @@map("idempotency_keys")
+}
+
+// ---------- Espaços (com RLS) ----------
+
+enum WorkspaceType {
+  personal
+  shared
+
+  @@map("workspace_type")
+}
+
+enum MemberRole {
+  owner
+  editor
+  viewer
+
+  @@map("member_role")
+}
+
+model Workspace {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  type      WorkspaceType
+  currency  String        @default("BRL") @db.Char(3)
+  timezone  String        @default("America/Sao_Paulo")
+  createdBy String        @map("created_by") @db.Uuid
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  memberships  Membership[]
+  invites      Invite[]
+  accounts     Account[]
+  categories   Category[]
+  creditCards  CreditCard[]
+  invoices     Invoice[]
+  transactions Transaction[]
+  series       TransactionSeries[]
+  transfers    TransferGroup[]
+  auditLogs    AuditLog[]
+
+  @@map("workspaces")
+}
+
+model Membership {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String     @map("workspace_id") @db.Uuid
+  userId      String     @map("user_id") @db.Uuid
+  role        MemberRole
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("memberships")
+}
+
+model Invite {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String     @map("workspace_id") @db.Uuid
+  email       String
+  role        MemberRole
+  tokenHash   String     @unique @map("token_hash")
+  invitedBy   String     @map("invited_by") @db.Uuid
+  expiresAt   DateTime   @map("expires_at") @db.Timestamptz(6)
+  acceptedAt  DateTime?  @map("accepted_at") @db.Timestamptz(6)
+  acceptedBy  String?    @map("accepted_by") @db.Uuid
+  revokedAt   DateTime?  @map("revoked_at") @db.Timestamptz(6)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("invites")
+}
+
+// ---------- Domínio financeiro (com RLS) ----------
+
+model Institution {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name     String
+  code     String? @unique
+  logoPath String? @map("logo_path")
+
+  accounts    Account[]
+  creditCards CreditCard[]
+
+  @@map("institutions")
+}
+
+enum AccountType {
+  checking
+  savings
+  cash
+  digital
+  investment
+  other
+
+  @@map("account_type")
+}
+
+model Account {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId         String      @map("workspace_id") @db.Uuid
+  name                String
+  type                AccountType
+  institutionId       String?     @map("institution_id") @db.Uuid
+  initialBalanceCents BigInt      @default(0) @map("initial_balance_cents")
+  openingDate         DateTime    @default(dbgenerated("CURRENT_DATE")) @map("opening_date") @db.Date
+  color               String?
+  includeInTotal      Boolean     @default(true) @map("include_in_total")
+  archivedAt          DateTime?   @map("archived_at") @db.Timestamptz(6)
+  createdBy           String      @map("created_by") @db.Uuid
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  institution   Institution?  @relation(fields: [institutionId], references: [id])
+  transactions  Transaction[]
+  payingCards   CreditCard[]
+
+  @@unique([workspaceId, id])
+  @@index([workspaceId])
+  @@map("accounts")
+}
+
+enum CategoryKind {
+  income
+  expense
+
+  @@map("category_kind")
+}
+
+model Category {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String       @map("workspace_id") @db.Uuid
+  name        String
+  kind        CategoryKind
+  icon        String?
+  color       String?
+  parentId    String?      @map("parent_id") @db.Uuid
+  archivedAt  DateTime?    @map("archived_at") @db.Timestamptz(6)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent       Category?     @relation("Subcategories", fields: [workspaceId, parentId], references: [workspaceId, id], onDelete: NoAction, onUpdate: NoAction, map: "categories_parent_fkey")
+  children     Category[]    @relation("Subcategories")
+  transactions Transaction[]
+
+  @@unique([workspaceId, id])
+  @@index([workspaceId, kind])
+  @@map("categories")
+}
+
+enum CardBrand {
+  visa
+  mastercard
+  elo
+  amex
+  hipercard
+  other
+
+  @@map("card_brand")
+}
+
+model CreditCard {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String     @map("workspace_id") @db.Uuid
+  name             String
+  brand            CardBrand
+  institutionId    String?    @map("institution_id") @db.Uuid
+  limitCents       BigInt     @map("limit_cents")
+  closingDay       Int        @map("closing_day") @db.SmallInt
+  dueDay           Int        @map("due_day") @db.SmallInt
+  paymentAccountId String     @map("payment_account_id") @db.Uuid
+  archivedAt       DateTime?  @map("archived_at") @db.Timestamptz(6)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  institution    Institution?  @relation(fields: [institutionId], references: [id])
+  paymentAccount Account       @relation(fields: [workspaceId, paymentAccountId], references: [workspaceId, id], onDelete: NoAction, onUpdate: NoAction, map: "credit_cards_payment_account_fkey")
+  invoices       Invoice[]
+  transactions   Transaction[]
+
+  @@unique([workspaceId, id])
+  @@index([workspaceId])
+  @@map("credit_cards")
+}
+
+model Invoice {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId    String   @map("workspace_id") @db.Uuid
+  creditCardId   String   @map("credit_card_id") @db.Uuid
+  referenceMonth DateTime @map("reference_month") @db.Date
+  closingDate    DateTime @map("closing_date") @db.Date
+  dueDate        DateTime @map("due_date") @db.Date
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creditCard   CreditCard    @relation(fields: [workspaceId, creditCardId], references: [workspaceId, id], onDelete: Cascade, map: "invoices_credit_card_fkey")
+  transactions Transaction[]
+
+  @@unique([workspaceId, id])
+  @@unique([creditCardId, referenceMonth])
+  @@map("invoices")
+}
+
+enum TransactionKind {
+  income
+  expense
+  transfer_in
+  transfer_out
+  invoice_payment
+  adjustment
+
+  @@map("transaction_kind")
+}
+
+enum TransactionStatus {
+  pending
+  paid
+  pending_review
+
+  @@map("transaction_status")
+}
+
+enum TransactionSource {
+  manual
+  recurring
+  import
+  open_finance
+
+  @@map("transaction_source")
+}
+
+enum SeriesType {
+  recurring
+  installment
+
+  @@map("series_type")
+}
+
+enum Frequency {
+  weekly
+  monthly
+  yearly
+
+  @@map("frequency")
+}
+
+model TransactionSeries {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId       String     @map("workspace_id") @db.Uuid
+  type              SeriesType
+  frequency         Frequency  @default(monthly)
+  interval          Int        @default(1) @db.SmallInt
+  startDate         DateTime   @map("start_date") @db.Date
+  endDate           DateTime?  @map("end_date") @db.Date
+  totalInstallments Int?       @map("total_installments") @db.SmallInt
+  template          Json
+  createdBy         String     @map("created_by") @db.Uuid
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([workspaceId, id])
+  @@map("transaction_series")
+}
+
+model TransferGroup {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  amountCents BigInt   @map("amount_cents")
+  date        DateTime @db.Date
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([workspaceId, id])
+  @@map("transfer_groups")
+}
+
+model Transaction {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId       String            @map("workspace_id") @db.Uuid
+  kind              TransactionKind
+  amountCents       BigInt            @map("amount_cents")
+  currency          String            @default("BRL") @db.Char(3)
+  description       String
+  competenceDate    DateTime          @map("competence_date") @db.Date
+  dueDate           DateTime?         @map("due_date") @db.Date
+  paidAt            DateTime?         @map("paid_at") @db.Date
+  status            TransactionStatus
+  ignored           Boolean           @default(false)
+  paymentMethod     String?           @map("payment_method")
+  notes             String?
+  source            TransactionSource @default(manual)
+  externalId        String?           @map("external_id")
+  accountId         String?           @map("account_id") @db.Uuid
+  creditCardId      String?           @map("credit_card_id") @db.Uuid
+  invoiceId         String?           @map("invoice_id") @db.Uuid
+  categoryId        String?           @map("category_id") @db.Uuid
+  seriesId          String?           @map("series_id") @db.Uuid
+  installmentNumber Int?              @map("installment_number") @db.SmallInt
+  transferGroupId   String?           @map("transfer_group_id") @db.Uuid
+  createdBy         String            @map("created_by") @db.Uuid
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  account       Account?           @relation(fields: [workspaceId, accountId], references: [workspaceId, id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_account_fkey")
+  creditCard    CreditCard?        @relation(fields: [workspaceId, creditCardId], references: [workspaceId, id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_credit_card_fkey")
+  invoice       Invoice?           @relation(fields: [workspaceId, invoiceId], references: [workspaceId, id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_invoice_fkey")
+  category      Category?          @relation(fields: [workspaceId, categoryId], references: [workspaceId, id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_category_fkey")
+  series        TransactionSeries? @relation(fields: [workspaceId, seriesId], references: [workspaceId, id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_series_fkey")
+  transferGroup TransferGroup?     @relation(fields: [workspaceId, transferGroupId], references: [workspaceId, id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_transfer_group_fkey")
+
+  @@index([workspaceId, competenceDate])
+  @@index([workspaceId, accountId])
+  @@index([workspaceId, invoiceId])
+  @@map("transactions")
+}
+
+model AuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String?  @map("workspace_id") @db.Uuid
+  actorId     String?  @map("actor_id") @db.Uuid
+  entity      String
+  entityId    String?  @map("entity_id")
+  action      String
+  before      Json?
+  after       Json?
+  ip          String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
