@@ -138,6 +138,13 @@ describe('Row-Level Security no próprio banco', () => {
     expect(rows.filter((r) => !r.rls).map((r) => r.table_name)).toEqual([]);
   });
 
+  it('todas as tabelas do schema public têm RLS (nada aberto para outros papéis)', async () => {
+    const rows = await owner.$queryRaw<{ relname: string }[]>`
+      SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity`;
+    expect(rows.map((r) => r.relname)).toEqual([]);
+  });
+
   it('sem usuário na transação, o papel da aplicação não enxerga nada', async () => {
     const ana = await registerUser(app, 'Ana');
     await createAccount(ana, ana.personalId, 'Conta da Ana').expect(201);
