@@ -1,0 +1,53 @@
+name: Database
+
+# Aplica papéis e migrations no banco de produção (Supabase).
+# Precisa dos secrets PROD_DATABASE_URL (usuário dono, pooler de sessão, porta 5432)
+# e PROD_API_DB_PASSWORD (senha do papel finflow_api). Sem eles, o job é pulado.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/db/prisma/**"
+      - "scripts/prod-roles.sql"
+      - ".github/workflows/database.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: database-production
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      HAS_SECRETS: ${{ secrets.PROD_DATABASE_URL != '' && secrets.PROD_API_DB_PASSWORD != '' }}
+    steps:
+      - name: Secrets configurados?
+        if: env.HAS_SECRETS != 'true'
+        run: echo "::warning::PROD_DATABASE_URL e PROD_API_DB_PASSWORD não configurados; nada foi aplicado."
+      - uses: actions/checkout@v4
+        if: env.HAS_SECRETS == 'true'
+      - uses: pnpm/action-setup@v4
+        if: env.HAS_SECRETS == 'true'
+      - uses: actions/setup-node@v4
+        if: env.HAS_SECRETS == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: env.HAS_SECRETS == 'true'
+        run: pnpm install --frozen-lockfile --filter @finflow/db
+      - name: Papéis
+        if: env.HAS_SECRETS == 'true'
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          PROD_API_DB_PASSWORD: ${{ secrets.PROD_API_DB_PASSWORD }}
+        run: |
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql "$PROD_DATABASE_URL" -q -v ON_ERROR_STOP=1 -v pw="$PROD_API_DB_PASSWORD" -f scripts/prod-roles.sql
+      - name: Migrations
+        if: env.HAS_SECRETS == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: pnpm --filter @finflow/db exec prisma migrate deploy
