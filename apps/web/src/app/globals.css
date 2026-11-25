@@ -1,0 +1,89 @@
+@import 'tailwindcss';
+
+/* Tokens do FinFlow — Design System (tokens.json). Mesmos nomes nos dois temas. */
+:root {
+  --bg: #f7f8f7;
+  --surface: #ffffff;
+  --surface-2: #eef1f0;
+  --border: #e1e5e3;
+  --ink: #1a1f1e;
+  --ink-2: #5c6664;
+  --ink-3: #7a8482;
+  --brand: #0f6e6e;
+  --brand-strong: #0a4a4a;
+  --brand-tint: #e6f2f1;
+  --on-brand: #ffffff;
+  --income: #1a7f45;
+  --income-tint: #e5f4ea;
+  --expense: #c2412d;
+  --expense-tint: #fbe9e6;
+  --warning: #946112;
+  --warning-tint: #fbf1df;
+  --info: #2b6cb0;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1413;
+    --surface: #161e1d;
+    --surface-2: #1f2928;
+    --border: #2a3534;
+    --ink: #e8eeec;
+    --ink-2: #9aa6a3;
+    --ink-3: #6f7b78;
+    --brand: #4fb3ae;
+    --brand-strong: #7cccc7;
+    --brand-tint: #12302e;
+    --on-brand: #062221;
+    --income: #5cc98a;
+    --income-tint: #14291c;
+    --expense: #f07a66;
+    --expense-tint: #331a16;
+    --warning: #e0a64a;
+    --warning-tint: #2e2412;
+    --info: #7aaee8;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-tint: var(--brand-tint);
+  --color-on-brand: var(--on-brand);
+  --color-income: var(--income);
+  --color-income-tint: var(--income-tint);
+  --color-expense: var(--expense);
+  --color-expense-tint: var(--expense-tint);
+  --color-warning: var(--warning);
+  --color-warning-tint: var(--warning-tint);
+  --color-info: var(--info);
+  --font-sans: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
