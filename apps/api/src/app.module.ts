@@ -5,6 +5,8 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AccountsController } from './accounts/accounts.controller';
 import { AccountsService } from './accounts/accounts.service';
 import { AuthController } from './auth/auth.controller';
+import { TransactionsController } from './transactions/transactions.controller';
+import { TransactionsService } from './transactions/transactions.service';
 import { AuthService } from './auth/auth.service';
 import { AuditService } from './common/audit.service';
 import { AuthGuard, Public } from './common/auth.guard';
@@ -40,7 +42,7 @@ export class AppModule {
           skipIf: () => config.NODE_ENV === 'test',
         }),
       ],
-      controllers: [HealthController, AuthController, WorkspacesController, AccountsController],
+      controllers: [HealthController, AuthController, WorkspacesController, AccountsController, TransactionsController],
       providers: [
         { provide: APP_CONFIG, useValue: config },
         PrismaService,
@@ -50,6 +52,7 @@ export class AppModule {
         WorkspacesService,
         InvitesService,
         AccountsService,
+        TransactionsService,
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: AuthGuard },
         { provide: APP_FILTER, useClass: HttpErrorFilter },
