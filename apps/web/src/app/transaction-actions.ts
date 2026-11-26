@@ -10,6 +10,7 @@ import { redirect } from 'next/navigation';
 import type { ZodError } from 'zod';
 import { api, ApiError } from '@/lib/api';
 import { createPurchaseFromForm } from './card-actions';
+import { createTransferFromForm } from './transfer-actions';
 import type { FormState } from '@/lib/types';
 
 function fieldErrors(error: ZodError): FormState {
@@ -45,6 +46,12 @@ function monthOf(date: string | undefined) {
 }
 
 export async function createTransactionAction(_: FormState, form: FormData): Promise<FormState> {
+  if (form.get('kind') === 'transfer') {
+    const r = await createTransferFromForm(form);
+    if (!r || !('month' in r)) return r;
+    if (form.get('again') === '1') return { ok: true, message: 'Transferência salva. Pode lançar a próxima.' };
+    redirect(`/lancamentos?mes=${r.month}`);
+  }
   if (form.get('method') === 'card') {
     const r = await createPurchaseFromForm(form);
     if (!r || !('cardId' in r)) return r;

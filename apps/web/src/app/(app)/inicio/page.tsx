@@ -138,7 +138,9 @@ export default async function Page() {
         <Link href="/cartoes" className="rounded-[12px] bg-surface p-4 text-[15px] font-semibold text-brand">Cadastrar um cartão de crédito</Link>
       )}
 
-      <p className="text-[13px] text-ink-2">Transferências entre contas chegam no próximo incremento.</p>
+      {canWrite && accounts.length > 1 ? (
+        <Link href="/lancamentos/novo?tipo=transferencia" className="rounded-[12px] bg-surface p-4 text-[15px] font-semibold text-brand">Transferir entre contas</Link>
+      ) : null}
     </AppShell>
   );
 }

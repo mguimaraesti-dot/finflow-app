@@ -39,7 +39,7 @@ export interface Category {
 
 export interface TransactionItem {
   id: string;
-  kind: 'income' | 'expense' | 'invoice_payment';
+  kind: 'income' | 'expense' | 'invoice_payment' | 'transfer_out';
   amount: number;
   description: string;
   date: string;
@@ -53,6 +53,8 @@ export interface TransactionItem {
   /** Fatura da compra ou do pagamento de fatura. */
   invoice: { cardId: string; month: string } | null;
   category: { id: string; name: string; icon: string | null } | null;
+  /** Transferência: a lista mostra a perna de saída; `to` é a conta de destino. */
+  transfer: { id: string; to: { id: string; name: string } | null } | null;
   createdBy: { id: string; name: string };
   series: { id: string; type: 'installment' | 'recurring'; number: number | null; total: number | null } | null;
 }
@@ -119,4 +121,16 @@ export interface CardPurchase {
   installments: number;
   card: { id: string; name: string };
   parts: { id: string; number: number | null; amount: number; invoiceId: string }[];
+}
+
+export interface Transfer {
+  id: string;
+  amount: number;
+  date: string;
+  description: string;
+  notes: string | null;
+  paid: boolean;
+  paidAt: string | null;
+  from: { id: string; name: string };
+  to: { id: string; name: string };
 }

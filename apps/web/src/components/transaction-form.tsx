@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useActionState, useMemo, useState } from 'react';
-import { CalendarDays, CheckCircle2, CreditCard, EyeOff, FileText, Landmark, Layers, Repeat, StickyNote, Tag } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, CalendarDays, CheckCircle2, CreditCard, EyeOff, FileText, Landmark, Layers, Repeat, StickyNote, Tag } from 'lucide-react';
 import { invoiceForPurchase, isValidIsoDate, MAX_CARD_INSTALLMENTS } from '@finflow/shared';
 import { createTransactionAction, updateTransactionAction } from '@/app/transaction-actions';
 import { FormMessage, SubmitButton } from '@/components/ui';
@@ -10,7 +10,7 @@ import { monthLabel } from '@/lib/format';
 import type { AccountSummary, CardSummary, Category, TransactionItem } from '@/lib/types';
 import { MoneyInput } from './money-input';
 
-type Kind = 'expense' | 'income';
+type Kind = 'expense' | 'income' | 'transfer';
 
 const fieldCls = 'h-11 w-full min-w-0 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-3';
 const chipCls =
@@ -51,6 +51,7 @@ export function TransactionForm({
   cancelHref,
   cards = [],
   defaultCardId,
+  defaultKind,
 }: {
   workspaceId: string;
   accounts: AccountSummary[];
@@ -60,10 +61,11 @@ export function TransactionForm({
   cancelHref: string;
   cards?: CardSummary[];
   defaultCardId?: string;
+  defaultKind?: Kind;
 }) {
   const editing = Boolean(existing);
   const [state, action] = useActionState(editing ? updateTransactionAction : createTransactionAction, null);
-  const [kind, setKind] = useState<Kind>(existing?.kind === 'income' ? 'income' : 'expense');
+  const [kind, setKind] = useState<Kind>(existing?.kind === 'income' ? 'income' : existing ? 'expense' : (defaultKind ?? 'expense'));
   const [date, setDate] = useState(existing?.date ?? today);
   const [paid, setPaid] = useState(true);
   const [paidTouched, setPaidTouched] = useState(false);
@@ -100,7 +102,8 @@ export function TransactionForm({
     );
   }
 
-  const paidWord = kind === 'expense' ? 'Foi paga' : 'Foi recebida';
+  const paidWord = kind === 'expense' ? 'Foi paga' : kind === 'income' ? 'Foi recebida' : 'Já foi feita';
+  const isTransfer = kind === 'transfer';
 
   return (
     <form action={action} className="flex flex-col gap-3 rounded-[20px] bg-surface p-4 md:p-6">
@@ -112,16 +115,16 @@ export function TransactionForm({
 
       {!editing ? (
         <div className="flex flex-col gap-2">
-          <div role="group" aria-label="Tipo" className="grid grid-cols-2 gap-[3px] rounded-[8px] bg-surface-2 p-[3px]">
-            {(['expense', 'income'] as const).map((k) => (
+          <div role="group" aria-label="Tipo" className="grid grid-cols-3 gap-[3px] rounded-[8px] bg-surface-2 p-[3px]">
+            {(['expense', 'income', 'transfer'] as const).map((k) => (
               <button
                 key={k}
                 type="button"
                 aria-pressed={kind === k}
                 onClick={() => setKind(k)}
-                className={`rounded-[6px] py-2.5 text-[13px] font-semibold text-ink-2 aria-pressed:bg-surface ${k === 'expense' ? 'aria-pressed:text-expense' : 'aria-pressed:text-income'}`}
+                className={`rounded-[6px] py-2.5 text-[13px] font-semibold text-ink-2 aria-pressed:bg-surface ${k === 'expense' ? 'aria-pressed:text-expense' : k === 'income' ? 'aria-pressed:text-income' : 'aria-pressed:text-ink'}`}
               >
-                {k === 'expense' ? 'Despesa' : 'Receita'}
+                {k === 'expense' ? 'Despesa' : k === 'income' ? 'Receita' : 'Transferência'}
               </button>
             ))}
           </div>
@@ -139,7 +142,7 @@ export function TransactionForm({
         <p className={`text-[13px] font-semibold ${kind === 'expense' ? 'text-expense' : 'text-income'}`}>{kind === 'expense' ? 'Despesa' : 'Receita'}</p>
       )}
 
-      <MoneyInput key={resetKey} name="amount" defaultCents={existing?.amount ?? 0} tone={kind} error={f.amount} autoFocus={!editing} />
+      <MoneyInput key={resetKey} name="amount" defaultCents={existing?.amount ?? 0} tone={kind === 'transfer' ? 'ink' : kind} error={f.amount} autoFocus={!editing} />
       <FormMessage state={state} />
 
       <div className="flex flex-col">
@@ -173,15 +176,35 @@ export function TransactionForm({
             key={resetKey}
             name="description"
             defaultValue={existing?.description}
-            required
+            required={!isTransfer}
             maxLength={120}
-            placeholder="Descrição"
+            placeholder={isTransfer ? 'Transferência' : 'Descrição'}
             aria-label="Descrição"
             aria-invalid={Boolean(f.description)}
             className={fieldCls}
           />
         </Row>
 
+        {isTransfer ? (
+          <>
+            <Row icon={ArrowUpFromLine} label="Sai da conta" hint={f.fromAccountId ? <span className="pb-1 text-[13px] text-expense">{f.fromAccountId}</span> : null}>
+              <select name="fromAccountId" defaultValue={accounts[0]?.id} aria-label="Sai da conta" className={fieldCls}>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>Sai de: {a.name}</option>
+                ))}
+              </select>
+            </Row>
+            <Row icon={ArrowDownToLine} label="Entra na conta" hint={f.toAccountId ? <span className="pb-1 text-[13px] text-expense">{f.toAccountId}</span> : null}>
+              <select name="toAccountId" defaultValue={accounts[1]?.id ?? accounts[0]?.id} aria-label="Entra na conta" className={fieldCls}>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>Entra em: {a.name}</option>
+                ))}
+              </select>
+            </Row>
+          </>
+        ) : null}
+
+        {isTransfer ? null : (
         <Row icon={Tag} label="Categoria">
           <select key={kind} name="categoryId" defaultValue={existing?.category?.id ?? ''} aria-label="Categoria" className={fieldCls}>
             <option value="">Sem categoria</option>
@@ -190,8 +213,9 @@ export function TransactionForm({
             ))}
           </select>
         </Row>
+        )}
 
-        {onCard ? (
+        {isTransfer ? null : onCard ? (
           <>
             <Row
               icon={CreditCard}
@@ -222,7 +246,7 @@ export function TransactionForm({
           </Row>
         )}
 
-        {!onCard ? (
+        {!onCard && !isTransfer ? (
           <Row icon={EyeOff} label="Ignorar" hint={ignored ? <span className="pb-1 text-[13px] text-ink-2">Fica no extrato, mas não entra no saldo nem nos totais.</span> : null}>
             <Switch name="ignored" checked={ignored} label="Ignorar nos totais" onChange={setIgnored} />
           </Row>
@@ -234,7 +258,7 @@ export function TransactionForm({
           Mais detalhes <span className="transition-transform group-open:rotate-90" aria-hidden>›</span>
         </summary>
         <div className="flex flex-col">
-          {!editing && !onCard ? (
+          {!editing && !onCard && !isTransfer ? (
             <Row icon={Repeat} label="Repetir">
               <div className="flex flex-col gap-2 py-1 md:flex-row md:items-center">
                 <select name="repeat" value={repeat} onChange={(e) => setRepeat(e.target.value as typeof repeat)} aria-label="Repetir" className={fieldCls}>

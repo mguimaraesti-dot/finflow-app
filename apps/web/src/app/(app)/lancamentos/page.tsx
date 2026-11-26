@@ -26,7 +26,7 @@ function applyFilter(items: TransactionItem[], filter: Filter, meId: string, min
       (filter === 'todos' ||
         (filter === 'despesas' && i.kind === 'expense') ||
         (filter === 'receitas' && i.kind === 'income') ||
-        (filter === 'pendentes' && i.status === 'pending' && !i.card && i.kind !== 'invoice_payment')) &&
+        (filter === 'pendentes' && i.status === 'pending' && !i.card && (i.kind === 'income' || i.kind === 'expense'))) &&
       (!mine || i.createdBy.id === meId),
   );
 }
@@ -38,6 +38,7 @@ const pendingTotal = (list: TransactionItem[]) =>
 
 function itemHref(t: TransactionItem, month: string) {
   if (t.card && t.invoice) return `/cartoes/compras/${t.id}?fatura=${t.invoice.month}`;
+  if (t.transfer) return `/transferencias/${t.transfer.id}?mes=${month}`;
   if (t.kind === 'invoice_payment' && t.invoice) return `/cartoes/${t.invoice.cardId}?mes=${t.invoice.month}`;
   return `/lancamentos/${t.id}?mes=${month}`;
 }
@@ -151,7 +152,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
                 <li key={t.id} className="flex items-center gap-3 border-t border-border px-4 py-3 first:border-t-0">
                   <Link href={itemHref(t, month)} className="flex min-w-0 flex-1 items-center gap-3">
                     <span className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-[13px] font-semibold text-ink-2" aria-hidden>
-                      {(t.category?.name ?? t.description).slice(0, 2)}
+                      {t.transfer ? '⇄' : (t.category?.name ?? t.description).slice(0, 2)}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className={`block truncate text-[15px] ${t.ignored ? 'text-ink-3 line-through' : ''}`}>
@@ -160,20 +161,24 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
                       </span>
                       <span className="block truncate text-[13px] text-ink-2">
                         {[
-                          t.kind === 'invoice_payment' ? 'Pagamento de fatura' : t.ignored ? 'Ignorado' : t.category?.name ?? 'Sem categoria',
-                          t.card ? t.card.name : t.account?.name,
+                          t.transfer ? `${t.account?.name ?? ''} → ${t.transfer.to?.name ?? ''}` : t.kind === 'invoice_payment' ? 'Pagamento de fatura' : t.ignored ? 'Ignorado' : t.category?.name ?? 'Sem categoria',
+                          t.transfer ? null : t.card ? t.card.name : t.account?.name,
                           shared ? t.createdBy.name.split(' ')[0] : null, t.series?.type === 'recurring' ? 'Todo mês' : null]
                           .filter(Boolean)
                           .join(' · ')}
                       </span>
                     </span>
-                    <span className={`num shrink-0 text-[15px] font-semibold ${t.ignored ? 'text-ink-3 line-through' : t.kind === 'income' ? 'text-income' : t.kind === 'invoice_payment' ? 'text-ink' : 'text-expense'}`}>
-                      {t.kind === 'income' ? '+ ' : '− '}
+                    <span className={`num shrink-0 text-[15px] font-semibold ${t.ignored ? 'text-ink-3 line-through' : t.kind === 'income' ? 'text-income' : t.kind === 'invoice_payment' || t.transfer ? 'text-ink' : 'text-expense'}`}>
+                      {t.transfer ? '' : t.kind === 'income' ? '+ ' : '− '}
                       {formatBRL(t.amount)}
                     </span>
                   </Link>
                   {t.card ? (
                     <span className="h-8 shrink-0 rounded-full bg-surface-2 px-2.5 text-[12px] font-semibold leading-8 text-ink-2">Cartão</span>
+                  ) : t.transfer ? (
+                    <span className={`h-8 shrink-0 rounded-full px-2.5 text-[12px] font-semibold leading-8 ${t.status === 'paid' ? 'bg-income-tint text-income' : 'bg-warning-tint text-warning'}`}>
+                      {t.status === 'paid' ? 'Feita' : 'Agendada'}
+                    </span>
                   ) : t.kind === 'invoice_payment' ? (
                     <span className="h-8 shrink-0 rounded-full bg-income-tint px-2.5 text-[12px] font-semibold leading-8 text-income">Pago</span>
                   ) : canWrite ? (

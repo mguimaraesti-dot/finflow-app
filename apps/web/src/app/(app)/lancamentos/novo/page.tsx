@@ -8,7 +8,7 @@ import type { AccountSummary, CardSummary, Category } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Novo lançamento' };
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ mes?: string; cartao?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ mes?: string; cartao?: string; tipo?: string }> }) {
   const sp = await searchParams;
   const here = '/lancamentos/novo';
   const ctx = await getContext(here);
@@ -29,6 +29,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
         today={todayIn('America/Sao_Paulo')}
         cards={cards}
         defaultCardId={cartao}
+        defaultKind={sp.tipo === 'transferencia' ? 'transfer' : sp.tipo === 'receita' ? 'income' : 'expense'}
         cancelHref={cartao ? `/cartoes/${cartao}` : `/lancamentos${month ? `?mes=${month}` : ''}`}
       />
     </AppShell>
