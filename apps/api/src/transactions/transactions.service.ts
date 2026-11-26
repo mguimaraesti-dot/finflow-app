@@ -21,6 +21,8 @@ const listInclude = {
   account: { select: { id: true, name: true } },
   category: { select: { id: true, name: true, icon: true } },
   series: { select: { type: true, totalInstallments: true } },
+  creditCard: { select: { id: true, name: true } },
+  invoice: { select: { referenceMonth: true, creditCardId: true } },
 } satisfies Prisma.TransactionInclude;
 
 type Row = Prisma.TransactionGetPayload<{ include: typeof listInclude }>;
@@ -37,6 +39,9 @@ function present(t: Row, names: Map<string, string>) {
     ignored: t.ignored,
     notes: t.notes,
     account: t.account ? { id: t.account.id, name: t.account.name } : null,
+    card: t.creditCard ? { id: t.creditCard.id, name: t.creditCard.name } : null,
+    // Compra no cartão ou pagamento de fatura: qual fatura (mês do vencimento).
+    invoice: t.invoice ? { cardId: t.invoice.creditCardId, month: toIsoDate(t.invoice.referenceMonth).slice(0, 7) } : null,
     category: t.category,
     createdBy: { id: t.createdBy, name: names.get(t.createdBy) ?? '' },
     series: t.seriesId
@@ -77,8 +82,7 @@ export class TransactionsService {
         where: {
           workspaceId,
           deletedAt: null,
-          kind: { in: [...ACCOUNT_KINDS] },
-          creditCardId: null,
+          kind: { in: [...ACCOUNT_KINDS, 'invoice_payment'] },
           competenceDate: { gte: fromIsoDate(from), lte: fromIsoDate(to) },
         },
         include: listInclude,
@@ -87,19 +91,22 @@ export class TransactionsService {
       const names = await this.memberNames(tx, workspaceId);
       const items = rows.map((r) => present(r, names));
 
+      // Receitas e despesas por competência, incluindo compras no cartão. O pagamento da
+      // fatura só move a conta: contá-lo de novo como despesa duplicaria o gasto.
       const counted = items.filter((i) => !i.ignored);
       const sum = (pred: (i: (typeof items)[number]) => boolean) => counted.filter(pred).reduce((s, i) => s + i.amount, 0);
       const income = sum((i) => i.kind === 'income');
       const expense = sum((i) => i.kind === 'expense');
+      const inAccount = (i: (typeof items)[number]) => i.card === null && i.kind !== 'invoice_payment';
       return {
         month,
         summary: {
           income,
           expense,
           result: income - expense,
-          incomePaid: sum((i) => i.kind === 'income' && i.status === 'paid'),
-          expensePaid: sum((i) => i.kind === 'expense' && i.status === 'paid'),
-          pendingCount: counted.filter((i) => i.status === 'pending').length,
+          incomePaid: sum((i) => inAccount(i) && i.kind === 'income' && i.status === 'paid'),
+          expensePaid: sum((i) => inAccount(i) && i.kind === 'expense' && i.status === 'paid'),
+          pendingCount: counted.filter((i) => inAccount(i) && i.status === 'pending').length,
         },
         items,
       };
