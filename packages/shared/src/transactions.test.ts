@@ -42,3 +42,13 @@ describe('createTransactionSchema', () => {
     expect(ok).toMatchObject({ paid: false, ignored: false, repeat: { type: 'none' } });
   });
 });
+
+import { addDays } from './dates.js';
+
+describe('addDays', () => {
+  it('atravessa fim de mês e de ano', () => {
+    expect(addDays('2026-11-26', 7)).toBe('2026-12-03');
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+  });
+});

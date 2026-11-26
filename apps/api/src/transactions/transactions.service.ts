@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { fromIsoDate, Prisma, toCents, toIsoDate, type Tx } from '@finflow/db';
 import {
+  addDays,
   addMonths,
   monthRange,
   planOccurrences,
@@ -119,6 +120,56 @@ export class TransactionsService {
           pendingCount: counted.filter((i) => inAccount(i) && i.status === 'pending').length,
         },
         items,
+      };
+    });
+  }
+
+  /**
+   * Contas a pagar e a receber: lançamentos pendentes em conta (atrasados de qualquer data
+   * e os próximos `days` dias) e faturas de cartão com saldo devedor no mesmo período.
+   */
+  bills(userId: string, workspaceId: string, days: number) {
+    return this.prisma.asUser(userId, async (tx) => {
+      await requireWorkspace(tx, workspaceId);
+      const today = await this.today(tx, workspaceId);
+      const until = addDays(today, days);
+      await this.extendOpenRecurrences(tx, workspaceId, until);
+      const rows = await tx.transaction.findMany({
+        where: {
+          workspaceId,
+          deletedAt: null,
+          ignored: false,
+          status: 'pending',
+          kind: { in: [...ACCOUNT_KINDS] },
+          creditCardId: null,
+          competenceDate: { lte: fromIsoDate(until) },
+        },
+        include: listInclude,
+        orderBy: [{ competenceDate: 'asc' }, { createdAt: 'asc' }],
+      });
+      const names = await this.memberNames(tx, workspaceId);
+      const invoices = await tx.$queryRaw<
+        { card_id: string; card_name: string; reference_month: Date; due_date: Date; total_cents: bigint; paid_cents: bigint }[]
+      >`
+        SELECT c.id AS card_id, c.name AS card_name, i.reference_month, i.due_date, b.total_cents, b.paid_cents
+        FROM invoice_balances b
+        JOIN invoices i ON i.id = b.invoice_id
+        JOIN credit_cards c ON c.id = i.credit_card_id
+        WHERE b.workspace_id = ${workspaceId}::uuid
+          AND b.total_cents > b.paid_cents
+          AND i.due_date <= ${until}::date
+        ORDER BY i.due_date`;
+      return {
+        today,
+        until,
+        items: rows.map((r) => present(r, names)),
+        invoices: invoices.map((i) => ({
+          cardId: i.card_id,
+          cardName: i.card_name,
+          month: toIsoDate(i.reference_month).slice(0, 7),
+          dueDate: toIsoDate(i.due_date),
+          remaining: toCents(i.total_cents - i.paid_cents),
+        })),
       };
     });
   }

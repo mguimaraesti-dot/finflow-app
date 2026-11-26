@@ -57,6 +57,13 @@ export function addMonths(date: IsoDate, delta: number): IsoDate {
   return clampedDate(target.year, target.month, day);
 }
 
+/** Soma dias a uma data de calendário. */
+export function addDays(date: IsoDate, delta: number): IsoDate {
+  const { year, month, day } = parseIsoDate(date);
+  const d = new Date(Date.UTC(year, month - 1, day + delta));
+  return toIsoDate({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() });
+}
+
 export function compareIsoDate(a: IsoDate, b: IsoDate): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }

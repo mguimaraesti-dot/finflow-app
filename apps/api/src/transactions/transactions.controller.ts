@@ -34,6 +34,13 @@ export class TransactionsController {
     return this.transactions.list(user.userId, workspaceId, m);
   }
 
+  @Get('bills')
+  bills(@CurrentUser() user: AuthUser, @Param('workspaceId', uuid) workspaceId: string, @Query('days') days?: string) {
+    const n = days === undefined ? 60 : Number(days);
+    if (!Number.isInteger(n) || n < 0 || n > 366) throw new BadRequestException({ error: 'invalid_days' });
+    return this.transactions.bills(user.userId, workspaceId, n);
+  }
+
   @Get('transactions/:id')
   get(@CurrentUser() user: AuthUser, @Param('workspaceId', uuid) workspaceId: string, @Param('id', uuid) id: string) {
     return this.transactions.get(user.userId, workspaceId, id);
