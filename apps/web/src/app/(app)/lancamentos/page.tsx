@@ -31,6 +31,11 @@ function applyFilter(items: TransactionItem[], filter: Filter, meId: string, min
   );
 }
 
+const daySpent = (list: TransactionItem[]) => list.filter((t) => t.kind === 'expense' && !t.ignored).reduce((s, t) => s + t.amount, 0);
+
+const pendingTotal = (list: TransactionItem[]) =>
+  list.filter((t) => t.kind === 'expense' && t.status === 'pending' && !t.card && !t.ignored).reduce((s, t) => s + t.amount, 0);
+
 function itemHref(t: TransactionItem, month: string) {
   if (t.card && t.invoice) return `/cartoes/compras/${t.id}?fatura=${t.invoice.month}`;
   if (t.kind === 'invoice_payment' && t.invoice) return `/cartoes/${t.invoice.cardId}?mes=${t.invoice.month}`;
@@ -83,6 +88,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
         </Link>
       </nav>
 
+      {pendingTotal(data.items) > 0 ? (
+        <Link href={qs({ filtro: 'pendentes' })} className="flex justify-between rounded-[12px] bg-warning-tint px-4 py-2.5 text-[13px] font-semibold text-warning">
+          Despesas pendentes no mês
+          <span className="num">{formatBRL(pendingTotal(data.items))}</span>
+        </Link>
+      ) : null}
+
       <section className="grid grid-cols-3 gap-2">
         <div className="rounded-[12px] bg-surface p-3 text-[13px] text-ink-2">
           Receitas<p className="num text-[15px] font-semibold text-income md:text-[17px]">{formatBRL(data.summary.income)}</p>
@@ -130,7 +142,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
       ) : (
         [...days.entries()].map(([date, list]) => (
           <section key={date} aria-label={date}>
-            <h2 className="px-1 pb-1.5 text-[12px] font-semibold tracking-[0.4px] text-ink-2">{dayLabel(date, today)}</h2>
+            <h2 className="flex justify-between px-1 pb-1.5 text-[12px] font-semibold tracking-[0.4px] text-ink-2">
+              {dayLabel(date, today)}
+              {daySpent(list) > 0 ? <span className="num font-normal normal-case tracking-normal">gasto no dia {formatBRL(daySpent(list))}</span> : null}
+            </h2>
             <ul className="overflow-hidden rounded-[12px] bg-surface">
               {list.map((t) => (
                 <li key={t.id} className="flex items-center gap-3 border-t border-border px-4 py-3 first:border-t-0">
