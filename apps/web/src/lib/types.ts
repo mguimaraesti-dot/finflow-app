@@ -134,3 +134,10 @@ export interface Transfer {
   from: { id: string; name: string };
   to: { id: string; name: string };
 }
+
+export interface Bills {
+  today: string;
+  until: string;
+  items: TransactionItem[];
+  invoices: { cardId: string; cardName: string; month: string; dueDate: string; remaining: number }[];
+}

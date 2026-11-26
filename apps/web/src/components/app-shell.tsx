@@ -1,14 +1,19 @@
 import Link from 'next/link';
-import { CreditCard, Home, List, LogOut, Plus, Users } from 'lucide-react';
+import { CalendarClock, CreditCard, Home, List, LogOut, Plus, Users } from 'lucide-react';
 import { logoutAction, switchWorkspaceAction } from '@/app/actions';
 import type { Me, WorkspaceSummary } from '@/lib/types';
 
 const NAV = [
   { href: '/inicio', label: 'Início', icon: Home },
   { href: '/lancamentos', label: 'Lançamentos', icon: List },
+  { href: '/a-pagar', label: 'A pagar e receber', icon: CalendarClock },
   { href: '/cartoes', label: 'Cartões', icon: CreditCard },
   { href: '/espacos', label: 'Espaços', icon: Users },
 ] as const;
+
+// No celular cabem quatro destinos ao redor do botão de lançar; "A pagar" fica no Início.
+const MOBILE_LEFT = [NAV[0], NAV[1]];
+const MOBILE_RIGHT = [NAV[3], NAV[4]];
 
 export function AppShell({
   me,
@@ -78,7 +83,7 @@ export function AppShell({
       </div>
 
       <nav aria-label="Principal" className="fixed inset-x-0 bottom-0 grid h-[72px] grid-cols-[1fr_1fr_72px_1fr_1fr] border-t border-border bg-surface pb-2 md:hidden">
-        {NAV.slice(0, 2).map(({ href, label, icon: Icon }) => (
+        {MOBILE_LEFT.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
@@ -96,7 +101,7 @@ export function AppShell({
         >
           <Plus size={28} strokeWidth={2} aria-hidden />
         </Link>
-        {NAV.slice(2).map(({ href, label, icon: Icon }) => (
+        {MOBILE_RIGHT.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

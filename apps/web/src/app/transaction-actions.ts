@@ -115,6 +115,7 @@ export async function togglePaidAction(form: FormData) {
   const id = str(form, 'id') ?? '';
   const paid = form.get('paid') === '1';
   await api(`/workspaces/${workspaceId}/transactions/${id}/${paid ? 'pay' : 'unpay'}`, { method: 'POST', body: {} });
+  revalidatePath('/a-pagar');
   revalidatePath('/lancamentos');
   revalidatePath('/inicio');
 }

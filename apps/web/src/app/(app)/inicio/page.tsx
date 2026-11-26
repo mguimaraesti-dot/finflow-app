@@ -71,7 +71,7 @@ export default async function Page() {
       <section className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between">
           <h2 className="text-[16px] font-semibold">A pagar</h2>
-          <Link href="/lancamentos?filtro=pendentes" className="text-[13px] font-semibold text-brand">Ver todos</Link>
+          <Link href="/a-pagar" className="text-[13px] font-semibold text-brand">Ver todos</Link>
         </div>
         {upcoming.length === 0 && invoicesDue.length === 0 ? (
           <p className="rounded-[12px] bg-surface p-4 text-[15px] text-ink-2">Nada pendente neste mês.</p>

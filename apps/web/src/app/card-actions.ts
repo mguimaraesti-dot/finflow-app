@@ -38,6 +38,7 @@ const month = (s: string) => (/^\d{4}-\d{2}$/.test(s) ? s : '');
 
 function refresh() {
   revalidatePath('/cartoes', 'layout');
+  revalidatePath('/a-pagar');
   revalidatePath('/lancamentos');
   revalidatePath('/inicio');
 }
