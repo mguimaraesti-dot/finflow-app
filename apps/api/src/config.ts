@@ -7,6 +7,9 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().int().default(4000),
   API_CORS_ORIGIN: z.string().default('http://localhost:3000'),
   WEB_URL: z.string().url().default('http://localhost:3000'),
+  /** Login com Google via Supabase Auth. Sem estas duas, o login com Google fica desligado. */
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_PUBLISHABLE_KEY: z.string().min(10).optional(),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

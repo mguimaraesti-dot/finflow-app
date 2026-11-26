@@ -28,7 +28,7 @@ describe('cadastro', () => {
     expect(await owner.consent.count({ where: { userId: user.id } })).toBe(1);
 
     const stored = await owner.user.findUniqueOrThrow({ where: { id: user.id } });
-    expect(stored.passwordHash.startsWith('$argon2id$')).toBe(true);
+    expect(stored.passwordHash!.startsWith('$argon2id$')).toBe(true);
   });
 
   it('recusa e-mail repetido, sem diferenciar maiúsculas', async () => {

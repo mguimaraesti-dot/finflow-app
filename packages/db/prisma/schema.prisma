@@ -18,7 +18,8 @@ model User {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email           String    @unique
   name            String
-  passwordHash    String    @map("password_hash")
+  /// Nulo para quem só entra com Google.
+  passwordHash    String?   @map("password_hash")
   emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
   mfaSecretEnc    String?   @map("mfa_secret_enc")
   mfaEnabledAt    DateTime? @map("mfa_enabled_at") @db.Timestamptz(6)
@@ -29,8 +30,25 @@ model User {
   passwordResets PasswordReset[]
   memberships    Membership[]
   consents       Consent[]
+  identities     UserIdentity[]
 
   @@map("users")
+}
+
+/// Login externo (Google via Supabase Auth). `subject` é o id do usuário no provedor.
+model UserIdentity {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  provider  String
+  subject   String
+  email     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, subject])
+  @@index([userId])
+  @@map("user_identities")
 }
 
 model Session {

@@ -12,6 +12,7 @@ import { TransfersService } from './transfers/transfers.service';
 import { TransactionsController } from './transactions/transactions.controller';
 import { TransactionsService } from './transactions/transactions.service';
 import { AuthService } from './auth/auth.service';
+import { SupabaseIdentityVerifier } from './auth/supabase-identity';
 import { AuditService } from './common/audit.service';
 import { AuthGuard, Public } from './common/auth.guard';
 import { HttpErrorFilter } from './common/http-errors';
@@ -53,6 +54,7 @@ export class AppModule {
         AuditService,
         MailerService,
         AuthService,
+        SupabaseIdentityVerifier,
         WorkspacesService,
         InvitesService,
         AccountsService,

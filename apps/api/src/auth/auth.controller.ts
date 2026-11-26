@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { z } from 'zod';
 import { Throttle } from '@nestjs/throttler';
 import {
   forgotPasswordSchema,
@@ -12,6 +13,8 @@ import {
 import { ClientInfo, CurrentUser, Public, type AuthUser } from '../common/auth.guard';
 import { ZodPipe } from '../common/zod.pipe';
 import { AuthService } from './auth.service';
+
+const googleSchema = z.object({ accessToken: z.string().min(20).max(8192) });
 
 @Controller('auth')
 export class AuthController {
@@ -30,6 +33,14 @@ export class AuthController {
   @Post('login')
   login(@Body(new ZodPipe(loginSchema)) body: LoginInput, @ClientInfo() client: ClientInfo) {
     return this.auth.login(body, client);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @HttpCode(200)
+  @Post('google')
+  google(@Body(new ZodPipe(googleSchema)) body: { accessToken: string }, @ClientInfo() client: ClientInfo) {
+    return this.auth.loginWithGoogle(body.accessToken, client);
   }
 
   @Public()

@@ -17,6 +17,7 @@ import {
   type AppConfig,
 } from '../config';
 import { seedDefaultCategories } from '../workspaces/default-categories';
+import { SupabaseIdentityVerifier } from './supabase-identity';
 
 // Parâmetros recomendados pela OWASP para Argon2id.
 const ARGON = { memoryCost: 19456, timeCost: 2, parallelism: 1 } as const;
@@ -37,6 +38,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly audit: AuditService,
     private readonly mailer: MailerService,
+    private readonly identity: SupabaseIdentityVerifier,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -77,6 +79,57 @@ export class AuthService {
       await this.audit.log(tx, { actorId: user.id, entity: 'user', entityId: user.id, action: 'login', ip: client.ip });
       return this.issueTokens(tx, user.id, client);
     });
+  }
+
+  /**
+   * Login com Google. Ordem: identidade já vinculada → conta existente com o mesmo e-mail
+   * (só se o Google confirmou o e-mail) → conta nova. Sempre devolve tokens do FinFlow.
+   */
+  async loginWithGoogle(accessToken: string, client: ClientInfo): Promise<TokenPair> {
+    const ext = await this.identity.verify(accessToken);
+    const linked = await this.prisma.client.userIdentity.findUnique({
+      where: { provider_subject: { provider: ext.provider, subject: ext.subject } },
+      select: { userId: true },
+    });
+    if (linked) {
+      return this.prisma.asUser(linked.userId, async (tx) => {
+        await this.audit.log(tx, { actorId: linked.userId, entity: 'user', entityId: linked.userId, action: 'login_google', ip: client.ip });
+        return this.issueTokens(tx, linked.userId, client);
+      });
+    }
+    if (!ext.emailVerified) {
+      throw new UnauthorizedException({ error: 'email_not_verified', message: 'O Google não confirmou este e-mail' });
+    }
+
+    const existing = await this.prisma.client.user.findUnique({ where: { email: ext.email }, select: { id: true } });
+    const userId = existing?.id ?? randomUUID();
+    try {
+      return await this.prisma.asUser(userId, async (tx) => {
+        if (!existing) {
+          await tx.user.create({ data: { id: userId, email: ext.email, name: ext.name, passwordHash: null, emailVerifiedAt: new Date() } });
+          const [row] = await tx.$queryRaw<{ id: string }[]>`SELECT app.create_workspace('Pessoal', 'personal') AS id`;
+          await seedDefaultCategories(tx, row!.id);
+          await tx.consent.create({ data: { userId, purpose: 'terms_and_privacy', version: '2026-11' } });
+        } else {
+          await tx.user.updateMany({ where: { id: userId, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
+        }
+        await tx.userIdentity.create({ data: { userId, provider: ext.provider, subject: ext.subject, email: ext.email } });
+        await this.audit.log(tx, {
+          actorId: userId,
+          entity: 'user',
+          entityId: userId,
+          action: existing ? 'link_google' : 'register_google',
+          ip: client.ip,
+        });
+        return this.issueTokens(tx, userId, client);
+      });
+    } catch (e) {
+      // Dois logins simultâneos da mesma conta Google: o segundo encontra o vínculo já criado.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException({ error: 'try_again', message: 'Tente entrar de novo' });
+      }
+      throw e;
+    }
   }
 
   /**
