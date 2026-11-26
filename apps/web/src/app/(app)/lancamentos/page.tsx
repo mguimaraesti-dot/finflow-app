@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatBRL, isValidMonth, shiftMonth, todayIn } from '@finflow/shared';
 import { restoreTransactionsAction, togglePaidAction } from '@/app/transaction-actions';
 import { AppShell } from '@/components/app-shell';
@@ -55,14 +55,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
 
   return (
     <AppShell {...ctx} current="/lancamentos">
-      <div className="flex items-center justify-between">
-        <h1 className="text-[20px] font-semibold">Lançamentos</h1>
-        {canWrite ? (
-          <Link href={`/lancamentos/novo?mes=${month}`} className="hidden h-11 items-center gap-2 rounded-[12px] bg-brand px-4 text-[15px] font-semibold text-on-brand md:flex">
-            <Plus size={18} aria-hidden /> Novo lançamento
-          </Link>
-        ) : null}
-      </div>
+      <h1 className="text-[20px] font-semibold">Lançamentos</h1>
 
       {sp.desfazer ? (
         <form action={restoreTransactionsAction} className="flex items-center justify-between gap-3 rounded-[12px] bg-ink px-4 py-3 text-[15px] text-surface">
