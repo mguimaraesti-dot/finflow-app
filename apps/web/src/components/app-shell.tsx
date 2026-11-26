@@ -1,10 +1,11 @@
 import Link from 'next/link';
-import { Home, LogOut, Users } from 'lucide-react';
+import { Home, List, LogOut, Plus, Users } from 'lucide-react';
 import { logoutAction, switchWorkspaceAction } from '@/app/actions';
 import type { Me, WorkspaceSummary } from '@/lib/types';
 
 const NAV = [
   { href: '/inicio', label: 'Início', icon: Home },
+  { href: '/lancamentos', label: 'Lançamentos', icon: List },
   { href: '/espacos', label: 'Espaços', icon: Users },
 ] as const;
 
@@ -25,6 +26,9 @@ export function AppShell({
     <div className="mx-auto flex min-h-dvh max-w-[1100px] flex-wrap">
       <aside className="hidden w-[232px] shrink-0 flex-col gap-1 border-r border-border px-3 py-6 md:flex">
         <p className="px-3 pb-4 text-[20px] font-semibold">FinFlow</p>
+        <Link href="/lancamentos/novo" className="mb-3 flex h-11 items-center justify-center gap-2 rounded-[12px] bg-brand text-[15px] font-semibold text-on-brand">
+          <Plus size={18} aria-hidden /> Novo lançamento
+        </Link>
         {NAV.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
@@ -72,8 +76,26 @@ export function AppShell({
         <main className="flex flex-col gap-4 px-4 pb-28 pt-4 md:px-8 md:pb-10">{children}</main>
       </div>
 
-      <nav aria-label="Principal" className="fixed inset-x-0 bottom-0 grid h-[72px] grid-cols-2 border-t border-border bg-surface pb-2 md:hidden">
-        {NAV.map(({ href, label, icon: Icon }) => (
+      <nav aria-label="Principal" className="fixed inset-x-0 bottom-0 grid h-[72px] grid-cols-[1fr_1fr_72px_1fr] border-t border-border bg-surface pb-2 md:hidden">
+        {NAV.slice(0, 2).map(({ href, label, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            aria-current={current === href ? 'page' : undefined}
+            className="flex flex-col items-center justify-center gap-0.5 text-[12px] font-semibold text-ink-2 aria-[current=page]:text-brand"
+          >
+            <Icon size={24} strokeWidth={1.5} aria-hidden />
+            {label}
+          </Link>
+        ))}
+        <Link
+          href="/lancamentos/novo"
+          aria-label="Novo lançamento"
+          className="mx-auto -mt-5 grid size-14 place-items-center rounded-full bg-brand text-on-brand shadow-[0_-4px_24px_rgba(14,20,19,0.10)]"
+        >
+          <Plus size={28} strokeWidth={2} aria-hidden />
+        </Link>
+        {NAV.slice(2).map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

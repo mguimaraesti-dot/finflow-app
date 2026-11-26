@@ -26,12 +26,13 @@ interface Options {
   /** Em Server Components, token vencido leva à rota de renovação e volta para `returnTo`. */
   returnTo?: string;
   auth?: boolean;
+  headers?: Record<string, string>;
 }
 
 /** Chamada à API a partir do servidor do Next (o navegador nunca vê os tokens). */
 export async function api<T>(path: string, opts: Options = {}): Promise<T> {
   const jar = await cookies();
-  const headers: Record<string, string> = { accept: 'application/json' };
+  const headers: Record<string, string> = { accept: 'application/json', ...opts.headers };
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
   if (opts.auth !== false) {
     const token = jar.get(ACCESS_COOKIE)?.value;
