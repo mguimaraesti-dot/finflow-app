@@ -39,7 +39,7 @@ export interface Category {
 
 export interface TransactionItem {
   id: string;
-  kind: 'income' | 'expense';
+  kind: 'income' | 'expense' | 'invoice_payment';
   amount: number;
   description: string;
   date: string;
@@ -48,6 +48,10 @@ export interface TransactionItem {
   ignored: boolean;
   notes: string | null;
   account: { id: string; name: string } | null;
+  /** Compra no cartão (não tem conta). */
+  card: { id: string; name: string } | null;
+  /** Fatura da compra ou do pagamento de fatura. */
+  invoice: { cardId: string; month: string } | null;
   category: { id: string; name: string; icon: string | null } | null;
   createdBy: { id: string; name: string };
   series: { id: string; type: 'installment' | 'recurring'; number: number | null; total: number | null } | null;
@@ -57,4 +61,62 @@ export interface TransactionList {
   month: string;
   summary: { income: number; expense: number; result: number; incomePaid: number; expensePaid: number; pendingCount: number };
   items: TransactionItem[];
+}
+
+export type InvoiceStatus = 'future' | 'open' | 'closed' | 'overdue' | 'paid';
+
+export interface CardBase {
+  id: string;
+  name: string;
+  brand: 'visa' | 'mastercard' | 'elo' | 'amex' | 'hipercard' | 'other';
+  limit: number;
+  closingDay: number;
+  dueDay: number;
+  paymentAccount: { id: string; name: string };
+}
+
+export interface CardSummary extends CardBase {
+  used: number;
+  available: number;
+  currentInvoice: { month: string; closingDate: string; dueDate: string; total: number; paid: number; status: InvoiceStatus };
+  due: { month: string; dueDate: string; remaining: number }[];
+}
+
+export interface InvoiceView {
+  card: CardBase & { archived: boolean };
+  invoice: {
+    id: string | null;
+    month: string;
+    closingDate: string;
+    dueDate: string;
+    total: number;
+    paid: number;
+    remaining: number;
+    status: InvoiceStatus;
+  };
+  items: {
+    id: string;
+    kind: 'expense' | 'income';
+    amount: number;
+    description: string;
+    date: string;
+    category: { id: string; name: string; icon: string | null } | null;
+    installment: { number: number; total: number } | null;
+  }[];
+  payments: { id: string; amount: number; date: string; account: { id: string; name: string } | null }[];
+  prev: string;
+  next: string;
+}
+
+export interface CardPurchase {
+  id: string;
+  kind: 'expense' | 'income';
+  amount: number;
+  description: string;
+  date: string;
+  category: { id: string; name: string; icon: string | null } | null;
+  notes: string | null;
+  installments: number;
+  card: { id: string; name: string };
+  parts: { id: string; number: number | null; amount: number; invoiceId: string }[];
 }

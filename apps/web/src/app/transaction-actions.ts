@@ -9,6 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { ZodError } from 'zod';
 import { api, ApiError } from '@/lib/api';
+import { createPurchaseFromForm } from './card-actions';
 import type { FormState } from '@/lib/types';
 
 function fieldErrors(error: ZodError): FormState {
@@ -44,6 +45,12 @@ function monthOf(date: string | undefined) {
 }
 
 export async function createTransactionAction(_: FormState, form: FormData): Promise<FormState> {
+  if (form.get('method') === 'card') {
+    const r = await createPurchaseFromForm(form);
+    if (!r || !('cardId' in r)) return r;
+    if (form.get('again') === '1') return { ok: true, message: 'Compra salva. Pode lançar a próxima.' };
+    redirect(`/lancamentos?mes=${r.month}`);
+  }
   const workspaceId = str(form, 'workspaceId') ?? '';
   const parsed = createTransactionSchema.safeParse({
     kind: str(form, 'kind'),

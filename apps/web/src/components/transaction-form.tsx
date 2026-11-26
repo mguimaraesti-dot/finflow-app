@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { useActionState, useMemo, useState } from 'react';
+import { invoiceForPurchase, isValidIsoDate, MAX_CARD_INSTALLMENTS } from '@finflow/shared';
 import { createTransactionAction, updateTransactionAction } from '@/app/transaction-actions';
 import { FormMessage, SubmitButton } from '@/components/ui';
-import type { AccountSummary, Category, TransactionItem } from '@/lib/types';
+import { monthLabel } from '@/lib/format';
+import type { AccountSummary, CardSummary, Category, TransactionItem } from '@/lib/types';
 import { MoneyInput } from './money-input';
 
 type Kind = 'expense' | 'income';
@@ -19,6 +21,8 @@ export function TransactionForm({
   today,
   existing,
   cancelHref,
+  cards = [],
+  defaultCardId,
 }: {
   workspaceId: string;
   accounts: AccountSummary[];
@@ -26,12 +30,19 @@ export function TransactionForm({
   today: string;
   existing?: TransactionItem;
   cancelHref: string;
+  cards?: CardSummary[];
+  defaultCardId?: string;
 }) {
   const editing = Boolean(existing);
   const [state, action] = useActionState(editing ? updateTransactionAction : createTransactionAction, null);
-  const [kind, setKind] = useState<Kind>(existing?.kind ?? 'expense');
+  const [kind, setKind] = useState<Kind>(existing?.kind === 'income' ? 'income' : 'expense');
   const [date, setDate] = useState(existing?.date ?? today);
   const [repeat, setRepeat] = useState<'none' | 'installment' | 'monthly'>('none');
+  const [method, setMethod] = useState<'account' | 'card'>(defaultCardId && cards.length ? 'card' : 'account');
+  const [cardId, setCardId] = useState(cards.find((c) => c.id === defaultCardId)?.id ?? cards[0]?.id ?? '');
+  const onCard = !editing && kind === 'expense' && method === 'card' && cards.length > 0;
+  const card = cards.find((c) => c.id === cardId);
+  const invoiceHint = onCard && card && isValidIsoDate(date) ? monthLabel(invoiceForPurchase(card, date).referenceMonth.slice(0, 7)) : null;
   const idempotencyKey = useMemo(() => crypto.randomUUID(), [state]);
   const cats = categories.filter((c) => c.kind === kind);
   const f = state?.fields ?? {};
@@ -55,6 +66,7 @@ export function TransactionForm({
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       {existing ? <input type="hidden" name="id" value={existing.id} /> : null}
       <input type="hidden" name="kind" value={kind} />
+      <input type="hidden" name="method" value={onCard ? 'card' : 'account'} />
 
       {!editing ? (
         <div role="group" aria-label="Tipo" className="grid grid-cols-2 gap-[3px] rounded-[8px] bg-surface-2 p-[3px]">
@@ -73,6 +85,22 @@ export function TransactionForm({
       ) : (
         <p className="text-[13px] font-semibold text-ink-2">{kind === 'expense' ? 'Despesa' : 'Receita'}</p>
       )}
+
+      {!editing && kind === 'expense' && cards.length > 0 ? (
+        <div role="group" aria-label="Pagar com" className="grid grid-cols-2 gap-[3px] rounded-[8px] bg-surface-2 p-[3px]">
+          {(['account', 'card'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={method === m}
+              onClick={() => setMethod(m)}
+              className="rounded-[6px] py-2 text-[13px] font-semibold text-ink-2 aria-pressed:bg-surface aria-pressed:text-ink"
+            >
+              {m === 'account' ? 'Na conta' : 'No cartão'}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <MoneyInput key={state?.ok ? idempotencyKey : "valor"} name="amount" defaultCents={existing?.amount ?? 0} tone={kind} error={f.amount} autoFocus={!editing} />
       <FormMessage state={state} />
@@ -114,17 +142,40 @@ export function TransactionForm({
             ))}
           </select>
         </div>
+        {onCard ? (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="f-card" className={labelCls}>Cartão</label>
+            <select id="f-card" name="cardId" value={cardId} onChange={(e) => setCardId(e.target.value)} className={selectCls}>
+              {cards.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {invoiceHint ? <span className="text-[13px] text-ink-2">Entra na fatura de {invoiceHint.toLowerCase()}.</span> : null}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="f-account" className={labelCls}>Conta</label>
+            <select id="f-account" name="accountId" defaultValue={existing?.account?.id ?? accounts[0]?.id} className={selectCls}>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {onCard ? (
         <div className="flex flex-col gap-1">
-          <label htmlFor="f-account" className={labelCls}>Conta</label>
-          <select id="f-account" name="accountId" defaultValue={existing?.account?.id ?? accounts[0]?.id} className={selectCls}>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
+          <label htmlFor="f-installments" className={labelCls}>Parcelas</label>
+          <select id="f-installments" name="installments" defaultValue="1" className={selectCls}>
+            {Array.from({ length: MAX_CARD_INSTALLMENTS }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>{n === 1 ? 'À vista' : `${n}x`}</option>
             ))}
           </select>
         </div>
-      </div>
+      ) : null}
 
-      {!editing ? (
+      {!editing && !onCard ? (
         <label className="flex min-h-12 items-center justify-between border-t border-border pt-3 text-[15px]">
           {kind === 'expense' ? 'Já paguei' : 'Já recebi'}
           <input type="checkbox" name="paid" defaultChecked={date <= today} className="size-5 accent-[var(--brand)]" />
@@ -132,9 +183,9 @@ export function TransactionForm({
       ) : null}
 
       <details className="border-t border-border pt-3" open={editing && Boolean(existing?.notes || existing?.ignored)}>
-        <summary className="cursor-pointer text-[13px] font-semibold text-brand">Mais detalhes{!editing ? ': repetir, parcelar, observação' : ''}</summary>
+        <summary className="cursor-pointer text-[13px] font-semibold text-brand">Mais detalhes{!editing && !onCard ? ': repetir, parcelar, observação' : ''}</summary>
         <div className="mt-3 flex flex-col gap-4">
-          {!editing ? (
+          {onCard ? null : !editing ? (
             <div className="grid gap-3 md:grid-cols-2">
               <div className="flex flex-col gap-1">
                 <label htmlFor="f-repeat" className={labelCls}>Repetir</label>
@@ -161,7 +212,7 @@ export function TransactionForm({
             <label htmlFor="f-notes" className={labelCls}>Observação</label>
             <textarea id="f-notes" name="notes" defaultValue={existing?.notes ?? ''} maxLength={500} rows={2} className="rounded-[8px] border border-ink-3 bg-surface px-3 py-2 text-[15px]" />
           </div>
-          <label className="flex items-start gap-2 text-[15px]">
+          <label className={`flex items-start gap-2 text-[15px] ${onCard ? 'hidden' : ''}`}>
             <input type="checkbox" name="ignored" defaultChecked={existing?.ignored} className="mt-1 size-5 accent-[var(--brand)]" />
             <span>
               Ignorar nos totais

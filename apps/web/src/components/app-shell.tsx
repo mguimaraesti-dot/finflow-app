@@ -1,11 +1,12 @@
 import Link from 'next/link';
-import { Home, List, LogOut, Plus, Users } from 'lucide-react';
+import { CreditCard, Home, List, LogOut, Plus, Users } from 'lucide-react';
 import { logoutAction, switchWorkspaceAction } from '@/app/actions';
 import type { Me, WorkspaceSummary } from '@/lib/types';
 
 const NAV = [
   { href: '/inicio', label: 'Início', icon: Home },
   { href: '/lancamentos', label: 'Lançamentos', icon: List },
+  { href: '/cartoes', label: 'Cartões', icon: CreditCard },
   { href: '/espacos', label: 'Espaços', icon: Users },
 ] as const;
 
@@ -76,7 +77,7 @@ export function AppShell({
         <main className="flex flex-col gap-4 px-4 pb-28 pt-4 md:px-8 md:pb-10">{children}</main>
       </div>
 
-      <nav aria-label="Principal" className="fixed inset-x-0 bottom-0 grid h-[72px] grid-cols-[1fr_1fr_72px_1fr] border-t border-border bg-surface pb-2 md:hidden">
+      <nav aria-label="Principal" className="fixed inset-x-0 bottom-0 grid h-[72px] grid-cols-[1fr_1fr_72px_1fr_1fr] border-t border-border bg-surface pb-2 md:hidden">
         {NAV.slice(0, 2).map(({ href, label, icon: Icon }) => (
           <Link
             key={href}

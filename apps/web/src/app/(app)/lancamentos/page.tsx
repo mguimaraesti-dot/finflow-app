@@ -26,9 +26,15 @@ function applyFilter(items: TransactionItem[], filter: Filter, meId: string, min
       (filter === 'todos' ||
         (filter === 'despesas' && i.kind === 'expense') ||
         (filter === 'receitas' && i.kind === 'income') ||
-        (filter === 'pendentes' && i.status === 'pending')) &&
+        (filter === 'pendentes' && i.status === 'pending' && !i.card && i.kind !== 'invoice_payment')) &&
       (!mine || i.createdBy.id === meId),
   );
+}
+
+function itemHref(t: TransactionItem, month: string) {
+  if (t.card && t.invoice) return `/cartoes/compras/${t.id}?fatura=${t.invoice.month}`;
+  if (t.kind === 'invoice_payment' && t.invoice) return `/cartoes/${t.invoice.cardId}?mes=${t.invoice.month}`;
+  return `/lancamentos/${t.id}?mes=${month}`;
 }
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ mes?: string; filtro?: string; meus?: string; desfazer?: string }> }) {
@@ -128,7 +134,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
             <ul className="overflow-hidden rounded-[12px] bg-surface">
               {list.map((t) => (
                 <li key={t.id} className="flex items-center gap-3 border-t border-border px-4 py-3 first:border-t-0">
-                  <Link href={`/lancamentos/${t.id}?mes=${month}`} className="flex min-w-0 flex-1 items-center gap-3">
+                  <Link href={itemHref(t, month)} className="flex min-w-0 flex-1 items-center gap-3">
                     <span className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-[13px] font-semibold text-ink-2" aria-hidden>
                       {(t.category?.name ?? t.description).slice(0, 2)}
                     </span>
@@ -138,17 +144,24 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
                         {t.series?.type === 'installment' ? ` ${t.series.number}/${t.series.total}` : ''}
                       </span>
                       <span className="block truncate text-[13px] text-ink-2">
-                        {[t.ignored ? 'Ignorado' : t.category?.name ?? 'Sem categoria', t.account?.name, shared ? t.createdBy.name.split(' ')[0] : null, t.series?.type === 'recurring' ? 'Todo mês' : null]
+                        {[
+                          t.kind === 'invoice_payment' ? 'Pagamento de fatura' : t.ignored ? 'Ignorado' : t.category?.name ?? 'Sem categoria',
+                          t.card ? t.card.name : t.account?.name,
+                          shared ? t.createdBy.name.split(' ')[0] : null, t.series?.type === 'recurring' ? 'Todo mês' : null]
                           .filter(Boolean)
                           .join(' · ')}
                       </span>
                     </span>
-                    <span className={`num shrink-0 text-[15px] font-semibold ${t.ignored ? 'text-ink-3 line-through' : t.kind === 'income' ? 'text-income' : 'text-expense'}`}>
+                    <span className={`num shrink-0 text-[15px] font-semibold ${t.ignored ? 'text-ink-3 line-through' : t.kind === 'income' ? 'text-income' : t.kind === 'invoice_payment' ? 'text-ink' : 'text-expense'}`}>
                       {t.kind === 'income' ? '+ ' : '− '}
                       {formatBRL(t.amount)}
                     </span>
                   </Link>
-                  {canWrite ? (
+                  {t.card ? (
+                    <span className="h-8 shrink-0 rounded-full bg-surface-2 px-2.5 text-[12px] font-semibold leading-8 text-ink-2">Cartão</span>
+                  ) : t.kind === 'invoice_payment' ? (
+                    <span className="h-8 shrink-0 rounded-full bg-income-tint px-2.5 text-[12px] font-semibold leading-8 text-income">Pago</span>
+                  ) : canWrite ? (
                     <form action={togglePaidAction}>
                       <input type="hidden" name="workspaceId" value={ctx.active.id} />
                       <input type="hidden" name="id" value={t.id} />
