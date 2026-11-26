@@ -7,6 +7,8 @@ import { AccountsService } from './accounts/accounts.service';
 import { AuthController } from './auth/auth.controller';
 import { CardsController } from './cards/cards.controller';
 import { CardsService } from './cards/cards.service';
+import { TransfersController } from './transfers/transfers.controller';
+import { TransfersService } from './transfers/transfers.service';
 import { TransactionsController } from './transactions/transactions.controller';
 import { TransactionsService } from './transactions/transactions.service';
 import { AuthService } from './auth/auth.service';
@@ -44,7 +46,7 @@ export class AppModule {
           skipIf: () => config.NODE_ENV === 'test',
         }),
       ],
-      controllers: [HealthController, AuthController, WorkspacesController, AccountsController, TransactionsController, CardsController],
+      controllers: [HealthController, AuthController, WorkspacesController, AccountsController, TransactionsController, CardsController, TransfersController],
       providers: [
         { provide: APP_CONFIG, useValue: config },
         PrismaService,
@@ -56,6 +58,7 @@ export class AppModule {
         AccountsService,
         TransactionsService,
         CardsService,
+        TransfersService,
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: AuthGuard },
         { provide: APP_FILTER, useClass: HttpErrorFilter },

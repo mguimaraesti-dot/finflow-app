@@ -4,3 +4,4 @@ export * from './invoice.js';
 export * from './schemas.js';
 export * from './transactions.js';
 export * from './cards.js';
+export * from './transfers.js';

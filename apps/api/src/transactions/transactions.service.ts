@@ -27,7 +27,7 @@ const listInclude = {
 
 type Row = Prisma.TransactionGetPayload<{ include: typeof listInclude }>;
 
-function present(t: Row, names: Map<string, string>) {
+function present(t: Row, names: Map<string, string>, transferTo = new Map<string, { id: string; name: string }>()) {
   return {
     id: t.id,
     kind: t.kind,
@@ -43,6 +43,8 @@ function present(t: Row, names: Map<string, string>) {
     // Compra no cartão ou pagamento de fatura: qual fatura (mês do vencimento).
     invoice: t.invoice ? { cardId: t.invoice.creditCardId, month: toIsoDate(t.invoice.referenceMonth).slice(0, 7) } : null,
     category: t.category,
+    // Transferência aparece uma vez na lista, pela perna de saída.
+    transfer: t.transferGroupId ? { id: t.transferGroupId, to: transferTo.get(t.transferGroupId) ?? null } : null,
     createdBy: { id: t.createdBy, name: names.get(t.createdBy) ?? '' },
     series: t.seriesId
       ? {
@@ -82,14 +84,22 @@ export class TransactionsService {
         where: {
           workspaceId,
           deletedAt: null,
-          kind: { in: [...ACCOUNT_KINDS, 'invoice_payment'] },
+          kind: { in: [...ACCOUNT_KINDS, 'invoice_payment', 'transfer_out'] },
           competenceDate: { gte: fromIsoDate(from), lte: fromIsoDate(to) },
         },
         include: listInclude,
         orderBy: [{ competenceDate: 'desc' }, { createdAt: 'desc' }],
       });
       const names = await this.memberNames(tx, workspaceId);
-      const items = rows.map((r) => present(r, names));
+      const groups = rows.flatMap((r) => (r.transferGroupId ? [r.transferGroupId] : []));
+      const ins = groups.length
+        ? await tx.transaction.findMany({
+            where: { workspaceId, transferGroupId: { in: groups }, kind: 'transfer_in', deletedAt: null },
+            select: { transferGroupId: true, account: { select: { id: true, name: true } } },
+          })
+        : [];
+      const transferTo = new Map(ins.map((i) => [i.transferGroupId!, i.account!]));
+      const items = rows.map((r) => present(r, names, transferTo));
 
       // Receitas e despesas por competência, incluindo compras no cartão. O pagamento da
       // fatura só move a conta: contá-lo de novo como despesa duplicaria o gasto.
@@ -97,7 +107,7 @@ export class TransactionsService {
       const sum = (pred: (i: (typeof items)[number]) => boolean) => counted.filter(pred).reduce((s, i) => s + i.amount, 0);
       const income = sum((i) => i.kind === 'income');
       const expense = sum((i) => i.kind === 'expense');
-      const inAccount = (i: (typeof items)[number]) => i.card === null && i.kind !== 'invoice_payment';
+      const inAccount = (i: (typeof items)[number]) => i.card === null && (i.kind === 'income' || i.kind === 'expense');
       return {
         month,
         summary: {

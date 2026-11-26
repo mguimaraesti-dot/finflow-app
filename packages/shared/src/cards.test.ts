@@ -46,3 +46,14 @@ describe('schemas de cartão', () => {
     expect(r).toMatchObject({ kind: 'expense', installments: 1 });
   });
 });
+
+import { createTransferSchema } from './transfers.js';
+
+describe('createTransferSchema', () => {
+  const a = '7b8c1c5e-4e0a-4b8f-9f3e-2d6a1b0c9e11';
+  const b = '8b8c1c5e-4e0a-4b8f-9f3e-2d6a1b0c9e11';
+  it('exige contas diferentes', () => {
+    expect(createTransferSchema.safeParse({ fromAccountId: a, toAccountId: a, amount: 100, date: '2026-11-26' }).success).toBe(false);
+    expect(createTransferSchema.parse({ fromAccountId: a, toAccountId: b, amount: 100, date: '2026-11-26' })).toMatchObject({ paid: true, description: 'Transferência' });
+  });
+});
