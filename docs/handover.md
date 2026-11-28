@@ -81,18 +81,12 @@ recuperação de senha e de verificação em duas etapas (ambos descartados).
 - Sem `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` na API, o endpoint responde 503 (desligado).
 - Testes em `apps/api/test/google.test.ts`.
 
-**Falta (Web):**
-1. `pnpm --filter @finflow/web add @supabase/supabase-js @supabase/ssr`.
-2. Server Action "Entrar com Google": cliente `createServerClient` (cookies do Next) →
-   `signInWithOAuth({ provider: 'google', options: { redirectTo: <web>/auth/callback?next=… } })`
-   → `redirect(data.url)`. O PKCE fica em cookie, gerenciado pelo `@supabase/ssr`.
-3. Route handler `app/auth/callback/route.ts`: `exchangeCodeForSession(code)` → `POST /auth/google`
-   com o `access_token` → `storeTokens` → `supabase.auth.signOut({ scope: 'local' })` →
-   redireciona para `safeNext(next)`. Em erro, `/entrar?erro=google`.
-4. Botão nas telas Entrar e Cadastro; na tela "Esqueci a senha", sugerir entrar com o Google.
-5. Variáveis: Web `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; API
-   `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY` (a chave publicável é pública, pode ser lida pelo
-   conector do Supabase).
+**Web (pronto):** botão "Entrar com Google" em Entrar e Cadastro (`app/google-actions.ts`), retorno
+em `app/auth/callback/route.ts` (troca o código, valida na API, grava a sessão do FinFlow e descarta
+a do Supabase). O botão só aparece com `GOOGLE_LOGIN=on` na Web.
+
+**Variáveis já na Vercel:** `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY` (API e Web, chave pública) e
+`SITE_URL` (Web). Falta só `GOOGLE_LOGIN=on` na Web, depois da configuração abaixo.
 
 **Configuração que só o dono pode fazer (envolve segredo do Google):**
 1. Google Cloud → APIs e serviços → Credenciais → ID do cliente OAuth (Aplicativo da Web).
@@ -119,7 +113,7 @@ recuperação de senha e de verificação em duas etapas (ambos descartados).
 | 1. Análise (matriz Mobills, MVP, arquitetura, modelo de dados, navegação) | Concluída |
 | 2. Design System e protótipos mobile | Concluída |
 | 3. Fundação técnica e publicação | Concluída |
-| 4. MVP | Funcionalidades principais prontas; falta concluir o login com Google |
+| 4. MVP | Funcionalidades principais prontas; login com Google aguardando configuração do provedor |
 | 5. App mobile (mesma API) | Não iniciada |
 
 ## 8. Como trabalhar no repositório
