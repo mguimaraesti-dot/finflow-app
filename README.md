@@ -3,9 +3,9 @@
 Gerenciador financeiro pessoal para uma pessoa sozinha ou para um casal. Cada pessoa tem um
 espaço **Pessoal**, só dela, e pode criar um espaço **Casal** e convidar a outra pessoa.
 
-> Status: Fase 3 (fundação técnica) — autenticação, espaços, convites, auditoria, isolamento
-> por Row-Level Security e o motor de faturas. Lançamentos, cartões e faturas na tela chegam
-> na Fase 4 (MVP).
+> Status: Fase 4 (MVP) — contas, lançamentos, cartões e faturas, transferências e contas a pagar
+> e receber publicados; login com Google em andamento. Situação completa e próximos passos em
+> [docs/handover.md](docs/handover.md).
 
 ## Estrutura
 
